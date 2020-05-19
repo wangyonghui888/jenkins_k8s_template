@@ -6,5 +6,5 @@
 3. dockerfile模板
 4. 一个简单的自动化例子用于jenkins job演示
 
-详情参考: [基于k8s集群进行持续集成测试](https://editor.csdn.net/md/?articleId=106211664)
+详情参考: [基于k8s集群进行持续集成测试](https://blog.csdn.net/weixin_44247496/article/details/106211664)
 

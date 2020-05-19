@@ -1,0 +1,26 @@
+# sudo docker build --tag swc-harbor.nioint.com/sqe/automation_python36:v1 -f Dockerfile_py36 ./
+
+FROM python:3.6.4
+
+LABEL maintainer="sqe_cvs@nio.com"
+
+USER root
+
+# 加入国内源
+ADD ./sources.list /etc/apt/
+
+# 更新
+RUN apt-get update
+RUN apt-get upgrade -y
+RUN apt-get dist-upgrade -y
+
+# 安装工具
+RUN apt-get -y install \
+       vim \
+       net-tools \
+       zip
+
+
+# 安装python包
+RUN pip install --upgrade pip
+RUN pip3 install pipenv

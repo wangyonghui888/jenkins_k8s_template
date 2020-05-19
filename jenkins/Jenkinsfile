@@ -1,0 +1,90 @@
+pipeline {
+
+	// 运行job所用的机器
+	agent {
+	    kubernetes{ // 连接k8s，并利用yamlFile创建jenkins slave
+	        cloud 'kubernetes-test' //k8s集群关联
+	        label 'SEQ-AUTOTEST-PYTHON36' //Pod前缀名,可用它来区分不同环境的Slave
+	        defaultContainer 'python36' // [*] stages和post步骤中默认用到的container。如需指定其他container，可用语法 container("java8"){...}
+	        idleMinutes 10 //所创建的pod在job结束后直到销毁前的等待时间
+	        yamlFile "jenkins/jenkins_pod_template.yaml" // 指定创建pod时的yaml配置文件
+	    }
+	}
+
+   // job的自定义参数，可在job运行前修改
+   parameters {
+       choice(name: 'env', choices: 'test\ndev\nstg', description: '测试环境，请选择dev？test？stg？')
+       string(name: 'keywords', defaultValue: 'test_case_example', description: '关键字，用于过滤测试用例，可以使用目录名、py文件名过滤')
+   }
+
+   // job的环境变量
+   environment {
+       //git相关
+       git_url = 'git@git.nevint.com:automation/seq_jenkins_template.git' // [*] 项目git地址
+       git_key = 'c8615bc3-c995-40ed-92ba-d5b66943f116' //固定值，不要修改
+       git_branch = 'master'
+       gitpullerr = 'noerr'
+
+       //job失败后发送的邮件名单
+       email_list = 'li.liu2@nio.com, hongzhen.bi@nio.com'
+   }
+
+   // job的一些配置设定
+   options {
+       buildDiscarder(logRotator(numToKeepStr: '30'))  //保存的job构建记录总数
+       timeout(time: 30, unit: 'MINUTES')  //job超时时间
+       disableConcurrentBuilds() //不允许同时执行流水线
+   }
+
+   // job触发时机
+   triggers {
+       //pollSCM('H * * * 1-5')//周一到周五，每小时 定时检查源码变更
+       cron('H H(1-2) * * *') //每天 定时触发
+       //gitlab(triggerOnPush: false, triggerOnMergeRequest: false, branchFilterType: 'All') //git变更触发
+       //upstream(upstreamProjects: "", threshold: hudson.model.Result.SUCCESS) //上游变更触发
+   }
+
+   // 具体job的步骤，自动化测试工作主要在此处进行填写
+   stages {
+       stage('拉取测试代码') {
+           steps {
+               git branch: "${git_branch}", credentialsId: "${git_key}", url: "${git_url}"
+           }
+       }
+       stage('安装测试依赖') {
+           steps {
+               sh "pipenv install --skip-lock"
+               sh "pipenv graph"
+
+           }
+       }
+       stage('执行测试用例') {
+           steps {
+               sh "rm -rf $env.WORKSPACE/allure-*"//执行前先清空报告
+               sh "pipenv run py.test --env '${params.env}' -k '${params.keywords}'" // [*] 执行自动化代码
+           }
+       }
+   }
+
+   // job收尾工作
+   post {
+       always{
+           container("jnlp"){
+               // 将allure 报告展示到jenkins上
+               allure includeProperties: false, jdk: '', report: 'jenkins-allure-report', results: [[path: 'allure-results']]
+           }
+       }
+       failure {
+           script {
+               if (gitpullerr == 'noerr') {
+                   mail to: "${email_list}",
+                   subject: "[Jenkins Build Notification] ${env.JOB_NAME} - Build # ${env.BUILD_NUMBER} -构建失败!",
+                   body: "'${env.JOB_NAME}' (${env.BUILD_NUMBER}) 执行失败了 \n请及时前往 ${env.BUILD_URL} 进行查看"
+               } else {
+                   echo 'scm pull error ignore send mail'
+               }
+           }
+       }
+   }
+}
+

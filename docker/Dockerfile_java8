@@ -1,0 +1,31 @@
+# sudo docker build --tag swc-harbor.nioint.com/sqe/automation_java8:v2 -f Dockerfile_java8 ./
+FROM maven:3.6.3-jdk-8
+
+LABEL maintainer="sqe_cvs@nio.com"
+
+USER root
+
+ARG ALLURE_VERSION=2.11.0
+
+# 设置系统时区为北京时间
+RUN mv /etc/localtime /etc/localtime.bak && \
+    ln -s /usr/share/zoneinfo/Asia/Shanghai  /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone # 解决JVM与linux系统时间不一致问题
+
+# 支持中文
+RUN apt-get update && \
+    apt-get install locales -y && \
+    echo "zh_CN.UTF-8 UTF-8" > /etc/locale.gen && \
+    locale-gen
+
+# 更新资源地址
+ADD settings.xml /root/.m2/
+
+# 安装jq
+RUN wget https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 \
+    && cp jq-linux64 /usr/bin/jq \
+    && chmod +x /usr/bin/jq
+
+# 安装jacococli
+COPY jacoco-plugin/jacococli.jar  /usr/bin
+RUN  chmod +x /usr/bin/jacococli.jar

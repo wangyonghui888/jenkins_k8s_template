@@ -1,0 +1,9 @@
+# docker build --tag swc-harbor.nioint.com/sqe/jnlp-slave:root_user -f Dockerfile_jnlp_root ./
+
+FROM swc-harbor.nioint.com/sqe/jnlp-slave:latest
+
+LABEL maintainer="sqe_cvs@nio.com"
+
+USER root
+
+
